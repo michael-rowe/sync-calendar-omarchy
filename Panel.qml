@@ -339,6 +339,9 @@ Panel {
   readonly property int cellSpacing: Style.space(2)
   readonly property int weekColumnWidth: Style.space(32)
   readonly property int gutterWidth: Style.space(14)
+  // Width of one grid row (week number, gutter, seven cells, spacing), so the
+  // calendar and agenda columns can share a size without reading gridColumn.
+  readonly property int gridWidth: weekColumnWidth + gutterWidth + 7 * cellWidth + 8 * cellSpacing
 
   function open() {
     refresh()
@@ -780,7 +783,8 @@ Panel {
     open: root.opened
     centerOnBar: true
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(560))
+    // Two columns side by side: month grid on the left, agenda on the right.
+    contentWidth: panel.fittedContentWidth(Style.space(560) + root.gridWidth + Style.space(24))
     contentHeight: panel.fittedContentHeight(calendarColumn.height)
 
     PanelKeyCatcher {
@@ -863,14 +867,25 @@ Panel {
 
         Column {
           id: calendarColumn
-          width: Math.max(calendarScroll.width, gridColumn.width)
+          width: Math.max(calendarScroll.width, bodyRow.width)
           spacing: Style.space(8)
+
+          // Two columns, placed explicitly rather than with a Row: a
+          // positioner around this Column re-polishes without end.
+          Item {
+            id: bodyRow
+            // Hides the agenda with the grid while Settings is open; each
+            // used to be hidden by sitting inside mainCalendarSection.
+            visible: !root.showingSettings
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: root.gridWidth * 2 + Style.space(24)
+            height: visible ? Math.max(mainCalendarSection.height, agendaSection.height) : 0
 
           Column {
             id: mainCalendarSection
             visible: !root.showingSettings
-            width: parent.width
-            height: visible ? childrenRect.height : 0
+            x: 0
+            width: root.gridWidth
             spacing: Style.space(8)
 
             // ---- Hero: today, centered. Once the view has stepped back
@@ -1389,12 +1404,15 @@ Panel {
               }
             }
           }
+          } // mainCalendarSection
 
-          // ---- Divider between Calendar grid and Agenda
+          // ---- Divider between Calendar grid and Agenda (vertical: the
+          // agenda sits to the right of the grid, not below it)
           Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: gridColumn.width
-            height: Style.spacing.hairline
+            visible: mainCalendarSection.visible
+            x: root.gridWidth + Style.space(12)
+            width: Style.spacing.hairline
+            height: mainCalendarSection.height
             color: root.contentForeground
             opacity: 0.12
           }
@@ -1402,8 +1420,8 @@ Panel {
           // ---- Agenda / Selected Date Events View
           Column {
             id: agendaSection
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: gridColumn.width
+            x: root.gridWidth + Style.space(24)
+            width: root.gridWidth
             spacing: Style.space(8)
 
             // Agenda Header: Selected date title + Sync button + Event count
@@ -2447,7 +2465,7 @@ Panel {
                 }
               }
             }
-          }
+          } // bodyRow
         }
 
         // ==========================================
